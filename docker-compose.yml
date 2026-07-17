@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # База данных для user-service
+  user-db:
+    image: postgres:15-alpine
+    container_name: user-postgres-db
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: elshin_user
+      POSTGRES_PASSWORD: secret_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+
+  # База данных для booking-service
+  booking-db:
+    image: postgres:15-alpine
+    container_name: booking-postgres-db
+    environment:
+      POSTGRES_DB: booking_db
+      POSTGRES_USER: elshin_booking
+      POSTGRES_PASSWORD: booking_password
+    ports:
+      - "5433:5432" # Пробрасываем внутренний порт 5432 контейнера на внешний порт 5433 хоста
+    volumes:
+      - booking_db_data:/var/lib/postgresql/data
+
+volumes:
+  user_db_data:
+  booking_db_data:

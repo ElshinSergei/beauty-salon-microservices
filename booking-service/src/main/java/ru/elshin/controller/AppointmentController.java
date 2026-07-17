@@ -1,0 +1,46 @@
+package ru.elshin.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import ru.elshin.entity.Appointment;
+import ru.elshin.service.AppointmentService;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/appointments")
+@RequiredArgsConstructor
+public class AppointmentController {
+
+    private final AppointmentService appointmentService;
+
+    @PostMapping
+    public ResponseEntity<Appointment> createAppointment(@RequestBody Appointment appointment) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(appointmentService.createAppointment(appointment));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Appointment>> getAllAppointments() {
+        return ResponseEntity.ok(appointmentService.getAllAppointments());
+    }
+
+    @GetMapping("/master/{masterId}")
+    public ResponseEntity<List<Appointment>> getMasterAppointments(
+            @PathVariable Long masterId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        if (date != null) {
+            // Если дата передана, отдаем расписание на день
+            List<Appointment> dailyAppointments = appointmentService.getAppointmentsByMasterAndDate(masterId, date);
+            return ResponseEntity.ok(dailyAppointments);
+        }
+        // Если даты нет, отдаем вообще все записи мастера
+        List<Appointment> allAppointments = appointmentService.getAppointmentsByMaster(masterId);
+        return ResponseEntity.ok(allAppointments);
+    }
+}

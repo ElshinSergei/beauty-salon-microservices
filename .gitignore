@@ -1,0 +1,26 @@
+# Compiled class file
+target/
+*.class
+
+# Log files
+*.log
+
+# Package files
+*.jar
+*.war
+
+# Virtual machines write Java crash logs here
+hs_err_pid*
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.classpath
+.project
+bin/
+
+# Application properties containing sensitive data (optional but recommended)
+# application-local.properties
