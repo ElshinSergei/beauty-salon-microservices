@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # База данных для user-service
   user-db:
@@ -13,6 +11,8 @@ services:
       - "5432:5432"
     volumes:
       - user_db_data:/var/lib/postgresql/data
+    networks:
+      - beauty-network
 
   # База данных для booking-service
   booking-db:
@@ -26,7 +26,26 @@ services:
       - "5433:5432" # Пробрасываем внутренний порт 5432 контейнера на внешний порт 5433 хоста
     volumes:
       - booking_db_data:/var/lib/postgresql/data
+    networks:
+      - beauty-network
+
+    # Наш брокер сообщений RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: beauty_salon_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   # Порт для подключения Spring Boot (AMQP)
+      - "15672:15672" # Веб-панель (Management)
+    networks:
+      - beauty-network
 
 volumes:
   user_db_data:
   booking_db_data:
+
+networks:
+  beauty-network: # Общая сеть, чтобы контейнеры могли общаться друг с другом напрямую по именам сервисов
+    driver: bridge

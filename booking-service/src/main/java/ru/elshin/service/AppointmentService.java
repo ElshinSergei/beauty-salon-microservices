@@ -2,8 +2,11 @@ package ru.elshin.service;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import ru.elshin.client.UserClient;
+import ru.elshin.config.RabbitMQConfig;
+import ru.elshin.dto.AppointmentEvent;
 import ru.elshin.dto.UserDto;
 import ru.elshin.entity.Appointment;
 import ru.elshin.entity.AppointmentStatus;
@@ -22,7 +25,9 @@ public class AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
     private final UserClient userClient; // Внедряем наш Feign-клиент
+    private final RabbitTemplate rabbitTemplate; // Внедряем шаблон для работы с RabbitMQ
 
+    @Transactional
     public Appointment createAppointment(Appointment appointment) {
         // 1. Проверяем существование клиента в user-service
         UserDto client = userClient.getUserById(appointment.getClientId());
@@ -31,7 +36,7 @@ public class AppointmentService {
 
         // 3. Проверяем, действительно ли у мастера роль MASTER
         if (!"MASTER".equalsIgnoreCase(master.getRole())) {
-            throw new AppointmentConflictException("User with ID " + appointment.getMasterId() + " is not registered as a Master!");
+            throw new AppointmentConflictException("Пользователь с ID " + appointment.getMasterId() + " не является мастером!");
         }
 
         // 4. Проверяем занятость мастера на это время
@@ -41,11 +46,28 @@ public class AppointmentService {
         );
 
         if (isTimeBusy) {
-            throw new AppointmentConflictException("Master is already booked at this time!");
+            throw new AppointmentConflictException("Мастер уже занят на это время!");
         }
 
         appointment.setStatus(AppointmentStatus.PENDING);
-        return appointmentRepository.save(appointment);
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+
+        // Формируем событие для брокера
+        AppointmentEvent event = new AppointmentEvent(
+                savedAppointment.getId(),
+                savedAppointment.getClientId(),
+                savedAppointment.getServiceName(),
+                savedAppointment.getAppointmentTime().toString()
+        );
+
+        // Отправляем асинхронно в обменник с ключом маршрутизации
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY,
+                event
+        );
+
+        return savedAppointment;
     }
 
     public List<Appointment> getAllAppointments() {
