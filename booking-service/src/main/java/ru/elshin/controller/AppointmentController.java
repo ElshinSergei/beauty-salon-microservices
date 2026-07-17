@@ -43,4 +43,18 @@ public class AppointmentController {
         List<Appointment> allAppointments = appointmentService.getAppointmentsByMaster(masterId);
         return ResponseEntity.ok(allAppointments);
     }
+
+    // Подтверждение записи мастером
+    @PatchMapping("/{id}/confirm")
+    public ResponseEntity<Appointment> confirmAppointment(@PathVariable Long id) {
+        Appointment confirmed = appointmentService.confirmAppointment(id);
+        return ResponseEntity.ok(confirmed);
+    }
+
+    // Отмена записи
+    @PatchMapping("/{id}/cancel")
+    public ResponseEntity<Appointment> cancelAppointment(@PathVariable Long id) {
+        Appointment cancelled = appointmentService.cancelAppointment(id);
+        return ResponseEntity.ok(cancelled);
+    }
 }

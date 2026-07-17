@@ -1,5 +1,6 @@
 package ru.elshin.service;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.elshin.client.UserClient;
@@ -24,20 +25,9 @@ public class AppointmentService {
 
     public Appointment createAppointment(Appointment appointment) {
         // 1. Проверяем существование клиента в user-service
-        UserDto client;
-        try {
-            client = userClient.getUserById(appointment.getClientId());
-        } catch (Exception e) {
-            throw new ResourceNotFoundException("Client with ID " + appointment.getClientId() + " not found!");
-        }
-
+        UserDto client = userClient.getUserById(appointment.getClientId());
         // 2. Проверяем существование мастера в user-service
-        UserDto master;
-        try {
-            master = userClient.getUserById(appointment.getMasterId());
-        } catch (Exception e) {
-            throw new ResourceNotFoundException("Master with ID " + appointment.getMasterId() + " not found!");
-        }
+        UserDto master = userClient.getUserById(appointment.getMasterId());
 
         // 3. Проверяем, действительно ли у мастера роль MASTER
         if (!"MASTER".equalsIgnoreCase(master.getRole())) {
@@ -78,4 +68,42 @@ public class AppointmentService {
         return appointmentRepository.findByMasterIdAndAppointmentTimeBetween(masterId, startOfDay, endOfDay);
     }
 
+    /**
+     * Подтверждение записи мастером
+     */
+    @Transactional
+    public Appointment confirmAppointment(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Запись с ID " + id + " не найдена"));
+
+        // Валидация: подтвердить можно только запись в статусе PENDING
+        if (appointment.getStatus() != AppointmentStatus.PENDING) {
+            throw new AppointmentConflictException(
+                    "Нельзя подтвердить запись в статусе " + appointment.getStatus()
+            );
+        }
+
+        appointment.setStatus(AppointmentStatus.CONFIRMED);
+        return appointmentRepository.save(appointment);
+    }
+
+    /**
+     * Отмена записи
+     */
+    @Transactional
+    public Appointment cancelAppointment(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Запись с ID " + id + " не найдена"));
+
+        // Валидация: нельзя отменить то, что уже выполнено (COMPLETED) или отменено (CANCELLED)
+        if (appointment.getStatus() == AppointmentStatus.COMPLETED) {
+            throw new AppointmentConflictException("Нельзя отменить уже выполненную запись!");
+        }
+        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
+            throw new AppointmentConflictException("Запись уже была отменена ранее!");
+        }
+
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        return appointmentRepository.save(appointment);
+    }
 }
