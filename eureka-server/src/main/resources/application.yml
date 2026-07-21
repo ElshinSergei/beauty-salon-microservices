@@ -1,0 +1,13 @@
+server:
+  port: 8761 # Стандартный порт для Eureka
+
+spring:
+  application:
+    name: eureka-server
+
+eureka:
+  client:
+    register-with-eureka: false # Не нужно регистрировать сервер сам в себе
+    fetch-registry: false       # Не нужно скачивать реестр, сервер сам его хранит
+    service-url:
+        defaultZone: http://localhost:8761/eureka/

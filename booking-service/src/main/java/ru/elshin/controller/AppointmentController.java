@@ -19,7 +19,13 @@ public class AppointmentController {
     private final AppointmentService appointmentService;
 
     @PostMapping
-    public ResponseEntity<Appointment> createAppointment(@RequestBody Appointment appointment) {
+    public ResponseEntity<Appointment> createAppointment(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestBody Appointment appointment) {
+
+        // Гарантируем, что запись создаётся именно для авторизованного пользователя
+        appointment.setClientId(userId);
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(appointmentService.createAppointment(appointment));
     }
@@ -27,6 +33,13 @@ public class AppointmentController {
     @GetMapping
     public ResponseEntity<List<Appointment>> getAllAppointments() {
         return ResponseEntity.ok(appointmentService.getAllAppointments());
+    }
+
+    // Получение записей ТЕКУЩЕГО авторизованного клиента
+    @GetMapping("/my")
+    public ResponseEntity<List<Appointment>> getMyAppointments(@RequestHeader("X-User-Id") Long userId) {
+        List<Appointment> myAppointments = appointmentService.getAppointmentsByUserId(userId);
+        return ResponseEntity.ok(myAppointments);
     }
 
     @GetMapping("/master/{masterId}")
@@ -53,7 +66,9 @@ public class AppointmentController {
 
     // Отмена записи
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<Appointment> cancelAppointment(@PathVariable Long id) {
+    public ResponseEntity<Appointment> cancelAppointment(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userId) {
         Appointment cancelled = appointmentService.cancelAppointment(id);
         return ResponseEntity.ok(cancelled);
     }

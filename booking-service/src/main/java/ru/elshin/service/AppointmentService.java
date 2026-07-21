@@ -128,4 +128,8 @@ public class AppointmentService {
         appointment.setStatus(AppointmentStatus.CANCELLED);
         return appointmentRepository.save(appointment);
     }
+
+    public List<Appointment> getAppointmentsByUserId(Long userId) {
+        return appointmentRepository.findByClientId(userId);
+    }
 }

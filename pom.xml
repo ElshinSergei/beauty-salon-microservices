@@ -20,6 +20,7 @@
         <module>booking-service</module>
         <module>notification-service</module>
         <module>gateway-service</module>
+        <module>eureka-server</module>
     </modules>
 
     <properties>

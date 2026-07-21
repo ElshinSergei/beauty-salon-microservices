@@ -2,7 +2,9 @@ package ru.elshin.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.elshin.dto.UserResponse;
 import ru.elshin.entity.User;
+import ru.elshin.exception.ResourceNotFoundException;
 import ru.elshin.repository.UserRepository;
 
 import java.util.List;
@@ -25,8 +27,20 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    public User getUserById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+    public UserResponse getUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Пользователь не найден с id: " + id));
+
+        return mapToResponse(user);
+    }
+
+    private UserResponse mapToResponse(User user) {
+        return new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getRole()
+        );
     }
 }

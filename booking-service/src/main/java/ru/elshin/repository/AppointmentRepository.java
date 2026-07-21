@@ -22,4 +22,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             LocalDateTime start,
             LocalDateTime end
     );
+
+    // Получение записей к конкретному пользователю
+    List<Appointment> findByClientId(Long clientId);
 }
