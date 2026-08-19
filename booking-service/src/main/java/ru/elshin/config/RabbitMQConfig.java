@@ -11,7 +11,10 @@ public class RabbitMQConfig {
 
     public static final String QUEUE_NAME = "appointment.notifications.queue";
     public static final String EXCHANGE_NAME = "appointment.exchange";
-    public static final String ROUTING_KEY = "appointment.created";
+
+    // Routing keys для отправки точечных событий
+    public static final String ROUTING_KEY_CREATED = "appointment.created";
+    public static final String ROUTING_KEY_STATUS_CHANGED = "appointment.status.changed";
 
     @Bean
     public Queue queue() {
@@ -25,7 +28,8 @@ public class RabbitMQConfig {
 
     @Bean
     public Binding binding(Queue queue, TopicExchange exchange) {
-        return BindingBuilder.bind(queue).to(exchange).with(ROUTING_KEY);
+        // "appointment.#" перехватывает все routing keys: appointment.created, appointment.status.changed, etc.
+        return BindingBuilder.bind(queue).to(exchange).with("appointment.#");
     }
 
     @Bean

@@ -11,3 +11,4 @@ eureka:
     fetch-registry: false       # Не нужно скачивать реестр, сервер сам его хранит
     service-url:
         defaultZone: http://localhost:8761/eureka/
+

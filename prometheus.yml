@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'spring-boot-services'
+    metrics_path: '/actuator/prometheus'
+    # Используем Docker Service Discovery
+    dns_sd_configs:
+      - names:
+          - 'user-service'
+          - 'booking-service'
+          - 'notification-service'
+          - 'gateway-service'
+        type: 'A'
+        port: 8080 # Это значение будет перезаписано в docker-compose, но здесь нужно указать хоть что-то
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: service

@@ -59,8 +59,10 @@ public class AppointmentController {
 
     // Подтверждение записи мастером
     @PatchMapping("/{id}/confirm")
-    public ResponseEntity<Appointment> confirmAppointment(@PathVariable Long id) {
-        Appointment confirmed = appointmentService.confirmAppointment(id);
+    public ResponseEntity<Appointment> confirmAppointment(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userId) {
+        Appointment confirmed = appointmentService.confirmAppointment(id, userId);
         return ResponseEntity.ok(confirmed);
     }
 
@@ -69,7 +71,7 @@ public class AppointmentController {
     public ResponseEntity<Appointment> cancelAppointment(
             @PathVariable Long id,
             @RequestHeader("X-User-Id") Long userId) {
-        Appointment cancelled = appointmentService.cancelAppointment(id);
+        Appointment cancelled = appointmentService.cancelAppointment(id, userId);
         return ResponseEntity.ok(cancelled);
     }
 }

@@ -60,6 +60,10 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
                 // 4. Обогащаем запрос заголовками для внутренних сервисов
                 ServerHttpRequest modifiedRequest = request.mutate()
+                        .headers(httpHeaders -> {
+                            httpHeaders.remove("X-User-Id");   // Удаляем то, что прислал внешний клиент
+                            httpHeaders.remove("X-User-Role"); // Удаляем роль, если прислали
+                        })
                         .header("X-User-Id", String.valueOf(claims.get("userId")))
                         .header("X-User-Role", String.valueOf(claims.get("role")))
                         .build();

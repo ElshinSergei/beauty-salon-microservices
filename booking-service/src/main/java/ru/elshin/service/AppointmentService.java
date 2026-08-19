@@ -2,11 +2,13 @@ package ru.elshin.service;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import ru.elshin.client.UserClient;
 import ru.elshin.config.RabbitMQConfig;
 import ru.elshin.dto.AppointmentEvent;
+import ru.elshin.dto.AppointmentStatusChangedEvent;
 import ru.elshin.dto.UserDto;
 import ru.elshin.entity.Appointment;
 import ru.elshin.entity.AppointmentStatus;
@@ -14,11 +16,13 @@ import ru.elshin.exception.AppointmentConflictException;
 import ru.elshin.exception.ResourceNotFoundException;
 import ru.elshin.repository.AppointmentRepository;
 
+import java.nio.file.AccessDeniedException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AppointmentService {
@@ -33,12 +37,10 @@ public class AppointmentService {
         UserDto client = userClient.getUserById(appointment.getClientId());
         // 2. Проверяем существование мастера в user-service
         UserDto master = userClient.getUserById(appointment.getMasterId());
-
         // 3. Проверяем, действительно ли у мастера роль MASTER
         if (!"MASTER".equalsIgnoreCase(master.getRole())) {
             throw new AppointmentConflictException("Пользователь с ID " + appointment.getMasterId() + " не является мастером!");
         }
-
         // 4. Проверяем занятость мастера на это время
         boolean isTimeBusy = appointmentRepository.existsByMasterIdAndAppointmentTime(
                 appointment.getMasterId(),
@@ -63,7 +65,7 @@ public class AppointmentService {
         // Отправляем асинхронно в обменник с ключом маршрутизации
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.EXCHANGE_NAME,
-                RabbitMQConfig.ROUTING_KEY,
+                RabbitMQConfig.ROUTING_KEY_CREATED,
                 event
         );
 
@@ -83,7 +85,6 @@ public class AppointmentService {
     public List<Appointment> getAppointmentsByMasterAndDate(Long masterId, LocalDate date) {
         // Начало дня: 2026-07-20T00:00
         LocalDateTime startOfDay = date.atStartOfDay();
-
         // Конец дня: 2026-07-20T23:59:59.999999999
         LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
 
@@ -94,9 +95,14 @@ public class AppointmentService {
      * Подтверждение записи мастером
      */
     @Transactional
-    public Appointment confirmAppointment(Long id) {
+    public Appointment confirmAppointment(Long id, Long currentUserId) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Запись с ID " + id + " не найдена"));
+
+        // Проверяем, что подтвердить запись может ТОЛЬКО мастер этой записи
+        if (!appointment.getMasterId().equals(currentUserId)) {
+            throw new AppointmentConflictException("Только мастер этой записи может подтвердить её!");
+        }
 
         // Валидация: подтвердить можно только запись в статусе PENDING
         if (appointment.getStatus() != AppointmentStatus.PENDING) {
@@ -105,17 +111,28 @@ public class AppointmentService {
             );
         }
 
+        String previousStatus = appointment.getStatus().name();
         appointment.setStatus(AppointmentStatus.CONFIRMED);
-        return appointmentRepository.save(appointment);
+        Appointment updated = appointmentRepository.save(appointment);
+
+        // Отправляем событие подтверждения в RabbitMQ
+        publishStatusChangeEvent(updated, previousStatus);
+
+        return updated;
     }
 
     /**
      * Отмена записи
      */
     @Transactional
-    public Appointment cancelAppointment(Long id) {
+    public Appointment cancelAppointment(Long id, Long currentUserId) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Запись с ID " + id + " не найдена"));
+
+        // Проверяем права на отмену (клиент или мастер)
+        if (!appointment.getClientId().equals(currentUserId) && !appointment.getMasterId().equals(currentUserId)) {
+            throw new AppointmentConflictException("У вас нет прав для отмены этой записи");
+        }
 
         // Валидация: нельзя отменить то, что уже выполнено (COMPLETED) или отменено (CANCELLED)
         if (appointment.getStatus() == AppointmentStatus.COMPLETED) {
@@ -125,11 +142,40 @@ public class AppointmentService {
             throw new AppointmentConflictException("Запись уже была отменена ранее!");
         }
 
+        String previousStatus = appointment.getStatus().name();
         appointment.setStatus(AppointmentStatus.CANCELLED);
-        return appointmentRepository.save(appointment);
+        Appointment updated = appointmentRepository.save(appointment);
+
+        publishStatusChangeEvent(updated, previousStatus);
+
+        return updated;
     }
 
     public List<Appointment> getAppointmentsByUserId(Long userId) {
         return appointmentRepository.findByClientId(userId);
     }
+
+    /**
+     * Вспомогательный метод для публикации событий смены статуса
+     */
+    private void publishStatusChangeEvent(Appointment appointment, String previousStatus) {
+        AppointmentStatusChangedEvent event = AppointmentStatusChangedEvent.builder()
+                .appointmentId(appointment.getId())
+                .clientId(appointment.getClientId())
+                .masterId(appointment.getMasterId())
+                .serviceName(appointment.getServiceName())
+                .appointmentTime(appointment.getAppointmentTime())
+                .previousStatus(previousStatus)
+                .newStatus(appointment.getStatus().name())
+                .build();
+
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_STATUS_CHANGED,
+                event
+        );
+        log.info("Отправлено событие смены статуса записи №{}: {} -> {}",
+                appointment.getId(), previousStatus, appointment.getStatus());
+    }
+
 }
