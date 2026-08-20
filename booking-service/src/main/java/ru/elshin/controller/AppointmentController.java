@@ -1,5 +1,8 @@
 package ru.elshin.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -14,11 +17,14 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/appointments")
 @RequiredArgsConstructor
+@Tag(name = "Appointments", description = "API для управления записями") // Аннотация для контроллера
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
 
     @PostMapping
+    @Operation(summary = "Создать новую запись", description = "Создает запись для авторизованного клиента")
+    @ApiResponse(responseCode = "201", description = "Запись успешно создана")
     public ResponseEntity<Appointment> createAppointment(
             @RequestHeader("X-User-Id") Long userId,
             @RequestBody Appointment appointment) {
@@ -31,18 +37,24 @@ public class AppointmentController {
     }
 
     @GetMapping
+    @Operation(summary = "Получить все записи", description = "Возвращает список всех записей (административная функция)")
+    @ApiResponse(responseCode = "200", description = "Список записей получен")
+
     public ResponseEntity<List<Appointment>> getAllAppointments() {
         return ResponseEntity.ok(appointmentService.getAllAppointments());
     }
 
-    // Получение записей ТЕКУЩЕГО авторизованного клиента
     @GetMapping("/my")
+    @Operation(summary = "Мои записи", description = "Получение записей текущего авторизованного клиента")
+    @ApiResponse(responseCode = "200", description = "Список записей клиента")
     public ResponseEntity<List<Appointment>> getMyAppointments(@RequestHeader("X-User-Id") Long userId) {
         List<Appointment> myAppointments = appointmentService.getAppointmentsByUserId(userId);
         return ResponseEntity.ok(myAppointments);
     }
 
     @GetMapping("/master/{masterId}")
+    @Operation(summary = "Записи мастера", description = "Получение всех записей мастера или записей на конкретную дату")
+    @ApiResponse(responseCode = "200", description = "Список записей мастера")
     public ResponseEntity<List<Appointment>> getMasterAppointments(
             @PathVariable Long masterId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
@@ -57,8 +69,9 @@ public class AppointmentController {
         return ResponseEntity.ok(allAppointments);
     }
 
-    // Подтверждение записи мастером
     @PatchMapping("/{id}/confirm")
+    @Operation(summary = "Подтвердить запись", description = "Подтверждение записи мастером")
+    @ApiResponse(responseCode = "200", description = "Запись подтверждена")
     public ResponseEntity<Appointment> confirmAppointment(
             @PathVariable Long id,
             @RequestHeader("X-User-Id") Long userId) {
@@ -66,8 +79,9 @@ public class AppointmentController {
         return ResponseEntity.ok(confirmed);
     }
 
-    // Отмена записи
     @PatchMapping("/{id}/cancel")
+    @Operation(summary = "Отменить запись", description = "Отмена записи (клиентом или мастером)")
+    @ApiResponse(responseCode = "200", description = "Запись отменена")
     public ResponseEntity<Appointment> cancelAppointment(
             @PathVariable Long id,
             @RequestHeader("X-User-Id") Long userId) {
